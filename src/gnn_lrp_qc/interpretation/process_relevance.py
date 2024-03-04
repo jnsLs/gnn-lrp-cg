@@ -175,14 +175,13 @@ class ProcessRelevance:
 
         x = so3.scalar2rsh(x0, int(self.model.representation.lmax))
 
-        for layer_idx, so3conv, mixing1, mixing2, gating, mixing3 in enumerate(
-                zip(
+        for so3conv, mixing1, mixing2, gating, mixing3 in zip(
                     self.model.representation.so3convs,
                     self.model.representation.mixings1,
                     self.model.representation.mixings2,
                     self.model.representation.gatings,
                     self.model.representation.mixings3
-                )
+
         ):
             dx = so3conv(x, radial_ij, Yij, cutoff_ij, idx_i, idx_j)
             ddx = mixing1(dx)

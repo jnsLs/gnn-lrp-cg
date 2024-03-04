@@ -20,7 +20,7 @@ target_property = "energy_U0"
 #modelpath = "/home/jonas/Documents/6-xai-cg/training/runs/8ef4a808-da1f-11ee-ab06-a86daa816ce9/best_model"  # painn
 modelpath = "/home/jonas/Documents/6-xai-cg/training/runs/0ae983dc-da36-11ee-af00-a86daa816ce9/best_model"  # so3net
 smiles = "CC(=O)NC1=CC=C(C=C1)O"    # paracetamol
-RelevanceProcessor = ProcessRelevanceGNNLRP
+RelevanceProcessor = ProcessRelevancePope
 zero_bias = False
 
 # Set up parameters visualization
