@@ -336,13 +336,25 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
             inputs = sample
 
         all_relevances = []
+        outputs = []
         # divide walks into batches
         walk_batches = list(chunker(all_walks, batchsize))
         for walks in walk_batches:
+
+            # the last batch might be smaller than the rest 
+            # thus we need to collate the data again
+            if len(walks) < batchsize:
+                # workaround since _atoms_collate_fn only works on cpu tensors
+                inputs = _atoms_collate_fn([sample for _ in range(len(walks))])
+                for k, v in inputs.items():
+                    inputs[k] = v.to(input_devices[k])
+
+            # if the batch contains a single walk continue with single-walk interpretation
             single_walk = False
             if len(walks) == 1:
                 single_walk = True
                 walks = walks[0]
+
             # reset grad
             self.model.zero_grad()
 
@@ -354,8 +366,11 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
             inputs = self.model.postprocess(inputs)
 
             y = inputs[self.target]
+            outputs.append(y)
+
             # backward pass
             torch.sum(y).backward(retain_graph=True)
+            
             # store walks relevance
             relevances = h0.data.cpu() * h0.grad.data.cpu()
             if single_walk:
@@ -372,8 +387,12 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
 
             # reset grad
             h0.grad.data.zero_()
-
-        return all_relevances, y
+        outputs = torch.cat(outputs)
+        diffs = torch.diff(outputs)
+        if not torch.allclose(torch.zeros(1, dtype=torch.float).to(diffs.device), diffs, atol=2e-4):
+            print("WARNING : all replicas don't have the same target output - returning all outputs")
+            return all_relevances, outputs
+        return all_relevances, torch.mean(outputs)
 
 
 ###############################################################################
