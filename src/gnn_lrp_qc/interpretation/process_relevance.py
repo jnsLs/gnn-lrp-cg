@@ -8,7 +8,9 @@ import torch.nn.functional as F
 
 from schnetpack import properties
 import schnetpack.nn.so3 as so3
+from schnetpack.data.loader import _atoms_collate_fn
 from gnn_lrp_qc.utils.molecular_graph import get_all_walks
+from gnn_lrp_qc.utils.batch import chunker
 
 
 def xai_forward(self, input: torch.Tensor):
@@ -71,7 +73,16 @@ class ProcessRelevance:
         # do masking
         if walk is not None:
             mask = torch.zeros(x.shape).to(self.device)
-            mask[walk[0]] = 1
+            # multi-walk interpretation
+            if isinstance(walk[0], tuple):
+                assert len(inputs[properties.n_atoms]) == len(walk), "Input data must contain as many collated frames as input walks"
+                offset = 0
+                for i,w in enumerate(walk):
+                    mask[w[0]+offset] = 1
+                    offset += inputs[properties.n_atoms][i]
+            # single-walk interpretation
+            else:
+                mask[walk[0]] = 1
             x = x * mask + (1 - mask) * x.data
 
         # compute interaction block to update atomic embeddings
@@ -81,7 +92,15 @@ class ProcessRelevance:
 
             if walk is not None:
                 mask = torch.zeros(x.shape).to(self.device)
-                mask[walk[layer_idx + 1]] = 1
+                # multi-walk interpretation
+                if isinstance(walk[0], tuple):
+                    offset = 0
+                    for i,w in enumerate(walk):
+                        mask[w[layer_idx + 1]+offset] = 1
+                        offset += inputs[properties.n_atoms][i]
+                # single-walk interpretation
+                else:
+                    mask[walk[layer_idx + 1]] = 1
                 x = x * mask + (1 - mask) * x.data
 
         inputs["scalar_representation"] = x
@@ -119,7 +138,16 @@ class ProcessRelevance:
         # do masking
         if walk is not None:
             mask = torch.zeros(q.shape).to(self.device)
-            mask[walk[0]] = 1
+            # multi-walk interpretation
+            if isinstance(walk[0], tuple):
+                assert len(inputs[properties.n_atoms]) == len(walk), "Input data must contain as many collated frames as input walks"
+                offset = 0
+                for i,w in enumerate(walk):
+                    mask[w[0]+offset] = 1
+                    offset += inputs[properties.n_atoms][i]
+            # single-walk interpretation
+            else:
+                mask[walk[0]] = 1
             q = q * mask + (1 - mask) * q.data
 
         for i, (interaction, mixing) in enumerate(
@@ -133,7 +161,15 @@ class ProcessRelevance:
                 q, _ = mixing(q, mu)
 
                 mask = torch.zeros(q.shape).to(self.device)
-                mask[walk[i + 1]] = 1
+                # multi-walk interpretation
+                if isinstance(walk[0], tuple):
+                    offset = 0
+                    for i,w in enumerate(walk):
+                        mask[w[i + 1]+offset] = 1
+                        offset += inputs[properties.n_atoms][i]
+                # single-walk interpretation
+                else:
+                    mask[walk[i + 1]] = 1
                 q = q * mask + (1 - mask) * q.data
 
             else:
@@ -170,7 +206,16 @@ class ProcessRelevance:
         # do masking
         if walk is not None:
             mask = torch.zeros(x0.shape).to(self.device)
-            mask[walk[0]] = 1
+            # multi-walk interpretation
+            if isinstance(walk[0], tuple):
+                assert len(inputs[properties.n_atoms]) == len(walk), "Input data must contain as many collated frames as input walks"
+                offset = 0
+                for i,w in enumerate(walk):
+                    mask[w[0]+offset] = 1
+                    offset += inputs[properties.n_atoms][i]
+            # single-walk interpretation
+            else:
+                mask[walk[0]] = 1
             x0 = x0 * mask + (1 - mask) * x0.data
 
         x = so3.scalar2rsh(x0, int(self.model.representation.lmax))
@@ -193,7 +238,15 @@ class ProcessRelevance:
 
             if walk is not None:
                 mask = torch.zeros(q.shape).to(self.device)
-                mask[walk[layer_idx + 1]] = 1
+                # multi-walk interpretation
+                if isinstance(walk[0], tuple):
+                    offset = 0
+                    for i,w in enumerate(walk):
+                        mask[w[layer_idx + 1]+offset] = 1
+                        offset += inputs[properties.n_atoms][i]
+                # single-walk interpretation
+                else:
+                    mask[walk[layer_idx + 1]] = 1
                 q = q * mask + (1 - mask) * q.data
 
         inputs["scalar_representation"] = x[:, 0]
@@ -254,7 +307,7 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
     def __init__(self, model, device, target, gamma, zero_bias=False):
         super(ProcessRelevanceGNNLRP, self).__init__(model, device, target, gamma, zero_bias=zero_bias)
 
-    def process(self, sample, all_walks=None):
+    def process(self, sample, all_walks=None, batchsize=1):
 
         adj = torch.zeros((len(sample[properties.Z]), len(sample[properties.Z])))
         for idx_i, idx_j in zip(sample[properties.idx_i], sample[properties.idx_j]):
@@ -262,35 +315,61 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
             adj[idx_j, idx_i] = 1
         # add diagonal
         adj += torch.eye(len(sample[properties.Z]))
-        adj.to(self.device) if self.device == "cuda" else None
+        adj = adj.to(self.device) if "cuda" in self.device else None
         sample["adjacency"] = adj
 
         if all_walks is None:
             # No pre-information given, so let's compute all possible walks.
             all_walks = get_all_walks(len(self.model.representation.interactions) + 1, adj, self_loops=True)
 
-        inputs = sample
+        #collate inputs to match batchsize
+        if batchsize > 1:
+            # workaround since _atoms_collate_fn only works on cpu tensors
+            input_devices = {}
+            for k, v in sample.items():
+                input_devices[k] = sample[k].device
+                sample[k] = v.to("cpu")
+            inputs = _atoms_collate_fn([sample for _ in range(batchsize)])
+            for k, v in inputs.items():
+                inputs[k] = v.to(input_devices[k])
+        else:
+            inputs = sample
 
         all_relevances = []
-        for walk in all_walks:
-
+        # divide walks into batches
+        walk_batches = list(chunker(all_walks, batchsize))
+        for walks in walk_batches:
+            single_walk = False
+            if len(walks) == 1:
+                single_walk = True
+                walks = walks[0]
             # reset grad
             self.model.zero_grad()
 
             for m in self.model.input_modules:
-                inputs = m(sample)
-            inputs, h0 = self.representation_forward(inputs, walk)
+                inputs = m(inputs)
+            inputs, h0 = self.representation_forward(inputs, walks)
             for m in self.model.output_modules:
                 inputs = m(inputs)
             inputs = self.model.postprocess(inputs)
 
             y = inputs[self.target]
             # backward pass
-            y.backward(retain_graph=True)
-            # store walk relevance
-            relevance = h0.data.cpu() * h0.grad.data.cpu()
-            relevance = relevance.sum().item()
-            all_relevances.append((walk, relevance))
+            torch.sum(y).backward(retain_graph=True)
+            # store walks relevance
+            relevances = h0.data.cpu() * h0.grad.data.cpu()
+            if single_walk:
+                relevance = relevances.sum().item()
+                all_relevances.append((walks, relevance))
+            else:
+                n_0,n_1 = 0,inputs[properties.n_atoms][0].item()
+                for i, w in enumerate(walks):
+                    relevance = relevances[n_0:n_1].sum().item()
+                    all_relevances.append((w, relevance))
+                    n_0 += inputs[properties.n_atoms][i]
+                    if i != len(walks)-1:
+                        n_1 += inputs[properties.n_atoms][i+1].item()
+
             # reset grad
             h0.grad.data.zero_()
 
