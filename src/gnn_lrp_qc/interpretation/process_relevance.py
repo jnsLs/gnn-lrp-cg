@@ -23,8 +23,12 @@ def apply_quotient_rule(model):
     for name, module in model.named_children():
         if isinstance(module, nn.Module):
             # If the module is a submodule, check its children recursively
-            if hasattr(module, 'activation') and (module.activation is nn.Identity or module.activation is not None):
-                print(f"{module.__class__.__name__} {name} has non-None activation: {module.activation}")
+            if hasattr(module, "activation") and (
+                module.activation is nn.Identity or module.activation is not None
+            ):
+                print(
+                    f"{module.__class__.__name__} {name} has non-None activation: {module.activation}"
+                )
                 module.forward = types.MethodType(xai_forward, module)
             apply_quotient_rule(module)
 
@@ -46,15 +50,18 @@ class ProcessRelevance:
         elif architecture_name == "SO3net":
             self.representation_forward = self.so3net_forward
         else:
-            raise NotImplementedError(f"Architecture {architecture_name} not implemented.")
+            raise NotImplementedError(
+                f"Architecture {architecture_name} not implemented."
+            )
 
         self._zero_bias() if zero_bias else None
 
     def process(self, sample):
         pass
 
-    def schnet_forward(self, inputs: Dict[str, torch.Tensor], walk: Optional[List] = None):
-
+    def schnet_forward(
+        self, inputs: Dict[str, torch.Tensor], walk: Optional[List] = None
+    ):
         atomic_numbers = inputs[properties.Z]
         r_ij = inputs[properties.Rij]
         idx_i = inputs[properties.idx_i]
@@ -75,10 +82,12 @@ class ProcessRelevance:
             mask = torch.zeros(x.shape).to(self.device)
             # multi-walk interpretation
             if isinstance(walk[0], tuple):
-                assert len(inputs[properties.n_atoms]) == len(walk), "Input data must contain as many collated frames as input walks"
+                assert len(inputs[properties.n_atoms]) == len(
+                    walk
+                ), "Input data must contain as many collated frames as input walks"
                 offset = 0
-                for i,w in enumerate(walk):
-                    mask[w[0]+offset] = 1
+                for i, w in enumerate(walk):
+                    mask[w[0] + offset] = 1
                     offset += inputs[properties.n_atoms][i]
             # single-walk interpretation
             else:
@@ -95,8 +104,8 @@ class ProcessRelevance:
                 # multi-walk interpretation
                 if isinstance(walk[0], tuple):
                     offset = 0
-                    for i,w in enumerate(walk):
-                        mask[w[layer_idx + 1]+offset] = 1
+                    for i, w in enumerate(walk):
+                        mask[w[layer_idx + 1] + offset] = 1
                         offset += inputs[properties.n_atoms][i]
                 # single-walk interpretation
                 else:
@@ -107,7 +116,9 @@ class ProcessRelevance:
 
         return inputs, h0
 
-    def painn_forward(self, inputs: Dict[str, torch.Tensor], walk: Optional[List] = None):
+    def painn_forward(
+        self, inputs: Dict[str, torch.Tensor], walk: Optional[List] = None
+    ):
         # get tensors from input dictionary
         atomic_numbers = inputs[properties.Z]
         r_ij = inputs[properties.Rij]
@@ -125,7 +136,9 @@ class ProcessRelevance:
         if self.model.representation.share_filters:
             filter_list = [filters] * self.model.representation.n_interactions
         else:
-            filter_list = torch.split(filters, 3 * self.model.representation.n_atom_basis, dim=-1)
+            filter_list = torch.split(
+                filters, 3 * self.model.representation.n_atom_basis, dim=-1
+            )
 
         q = self.model.representation.embedding(atomic_numbers)[:, None]
         qs = q.shape
@@ -140,10 +153,12 @@ class ProcessRelevance:
             mask = torch.zeros(q.shape).to(self.device)
             # multi-walk interpretation
             if isinstance(walk[0], tuple):
-                assert len(inputs[properties.n_atoms]) == len(walk), "Input data must contain as many collated frames as input walks"
+                assert len(inputs[properties.n_atoms]) == len(
+                    walk
+                ), "Input data must contain as many collated frames as input walks"
                 offset = 0
-                for i,w in enumerate(walk):
-                    mask[w[0]+offset] = 1
+                for i, w in enumerate(walk):
+                    mask[w[0] + offset] = 1
                     offset += inputs[properties.n_atoms][i]
             # single-walk interpretation
             else:
@@ -151,12 +166,13 @@ class ProcessRelevance:
             q = q * mask + (1 - mask) * q.data
 
         for i, (interaction, mixing) in enumerate(
-                zip(self.model.representation.interactions, self.model.representation.mixing)
+            zip(
+                self.model.representation.interactions, self.model.representation.mixing
+            )
         ):
             q, mu = interaction(q, mu, filter_list[i], dir_ij, idx_i, idx_j, n_atoms)
 
             if walk is not None:
-
                 mixing.zero_grad()
                 q, _ = mixing(q, mu)
 
@@ -164,8 +180,8 @@ class ProcessRelevance:
                 # multi-walk interpretation
                 if isinstance(walk[0], tuple):
                     offset = 0
-                    for i,w in enumerate(walk):
-                        mask[w[i + 1]+offset] = 1
+                    for i, w in enumerate(walk):
+                        mask[w[i + 1] + offset] = 1
                         offset += inputs[properties.n_atoms][i]
                 # single-walk interpretation
                 else:
@@ -182,7 +198,9 @@ class ProcessRelevance:
 
         return inputs, h0
 
-    def so3net_forward(self, inputs: Dict[str, torch.Tensor], walk: Optional[List] = None):
+    def so3net_forward(
+        self, inputs: Dict[str, torch.Tensor], walk: Optional[List] = None
+    ):
         # get tensors from input dictionary
         atomic_numbers = inputs[properties.Z]
         r_ij = inputs[properties.Rij]
@@ -208,10 +226,12 @@ class ProcessRelevance:
             mask = torch.zeros(x0.shape).to(self.device)
             # multi-walk interpretation
             if isinstance(walk[0], tuple):
-                assert len(inputs[properties.n_atoms]) == len(walk), "Input data must contain as many collated frames as input walks"
+                assert len(inputs[properties.n_atoms]) == len(
+                    walk
+                ), "Input data must contain as many collated frames as input walks"
                 offset = 0
-                for i,w in enumerate(walk):
-                    mask[w[0]+offset] = 1
+                for i, w in enumerate(walk):
+                    mask[w[0] + offset] = 1
                     offset += inputs[properties.n_atoms][i]
             # single-walk interpretation
             else:
@@ -221,12 +241,11 @@ class ProcessRelevance:
         x = so3.scalar2rsh(x0, int(self.model.representation.lmax))
 
         for so3conv, mixing1, mixing2, gating, mixing3 in zip(
-                    self.model.representation.so3convs,
-                    self.model.representation.mixings1,
-                    self.model.representation.mixings2,
-                    self.model.representation.gatings,
-                    self.model.representation.mixings3
-
+            self.model.representation.so3convs,
+            self.model.representation.mixings1,
+            self.model.representation.mixings2,
+            self.model.representation.gatings,
+            self.model.representation.mixings3,
         ):
             dx = so3conv(x, radial_ij, Yij, cutoff_ij, idx_i, idx_j)
             ddx = mixing1(dx)
@@ -241,8 +260,8 @@ class ProcessRelevance:
                 # multi-walk interpretation
                 if isinstance(walk[0], tuple):
                     offset = 0
-                    for i,w in enumerate(walk):
-                        mask[w[layer_idx + 1]+offset] = 1
+                    for i, w in enumerate(walk):
+                        mask[w[layer_idx + 1] + offset] = 1
                         offset += inputs[properties.n_atoms][i]
                 # single-walk interpretation
                 else:
@@ -260,19 +279,17 @@ class ProcessRelevance:
 
     def _zero_bias(self):
         for name, param in self.model.named_parameters():
-            if 'bias' in name:
+            if "bias" in name:
                 nn.init.constant_(param, 0)
 
 
 class ProcessRelevancePope(ProcessRelevance):
-
     def __init__(self, model, device, target, gamma, zero_bias=False):
         super(ProcessRelevancePope, self).__init__(
             model, device, target, gamma, zero_bias=zero_bias
         )
 
     def process(self, sample):
-
         inputs = sample
 
         # reset grad
@@ -303,12 +320,12 @@ class ProcessRelevancePope(ProcessRelevance):
 
 
 class ProcessRelevanceGNNLRP(ProcessRelevance):
-
     def __init__(self, model, device, target, gamma, zero_bias=False):
-        super(ProcessRelevanceGNNLRP, self).__init__(model, device, target, gamma, zero_bias=zero_bias)
+        super(ProcessRelevanceGNNLRP, self).__init__(
+            model, device, target, gamma, zero_bias=zero_bias
+        )
 
     def process(self, sample, all_walks=None, batchsize=1):
-
         adj = torch.zeros((len(sample[properties.Z]), len(sample[properties.Z])))
         for idx_i, idx_j in zip(sample[properties.idx_i], sample[properties.idx_j]):
             adj[idx_i, idx_j] = 1
@@ -320,9 +337,11 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
 
         if all_walks is None:
             # No pre-information given, so let's compute all possible walks.
-            all_walks = get_all_walks(len(self.model.representation.interactions) + 1, adj, self_loops=True)
+            all_walks = get_all_walks(
+                len(self.model.representation.interactions) + 1, adj, self_loops=True
+            )
 
-        #collate inputs to match batchsize
+        # collate inputs to match batchsize
         if batchsize > 1:
             # workaround since _atoms_collate_fn only works on cpu tensors
             input_devices = {}
@@ -340,8 +359,7 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
         # divide walks into batches
         walk_batches = list(chunker(all_walks, batchsize))
         for walks in walk_batches:
-
-            # the last batch might be smaller than the rest 
+            # the last batch might be smaller than the rest
             # thus we need to collate the data again
             if len(walks) < batchsize:
                 # workaround since _atoms_collate_fn only works on cpu tensors
@@ -370,27 +388,31 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
 
             # backward pass
             torch.sum(y).backward(retain_graph=True)
-            
+
             # store walks relevance
             relevances = h0.data.cpu() * h0.grad.data.cpu()
             if single_walk:
                 relevance = relevances.sum().item()
                 all_relevances.append((walks, relevance))
             else:
-                n_0,n_1 = 0,inputs[properties.n_atoms][0].item()
+                n_0, n_1 = 0, inputs[properties.n_atoms][0].item()
                 for i, w in enumerate(walks):
                     relevance = relevances[n_0:n_1].sum().item()
                     all_relevances.append((w, relevance))
                     n_0 += inputs[properties.n_atoms][i]
-                    if i != len(walks)-1:
-                        n_1 += inputs[properties.n_atoms][i+1].item()
+                    if i != len(walks) - 1:
+                        n_1 += inputs[properties.n_atoms][i + 1].item()
 
             # reset grad
             h0.grad.data.zero_()
         outputs = torch.cat(outputs)
         diffs = torch.diff(outputs)
-        if not torch.allclose(torch.zeros(1, dtype=torch.float).to(diffs.device), diffs, atol=2e-4):
-            print("WARNING : all replicas don't have the same target output - returning all outputs")
+        if not torch.allclose(
+            torch.zeros(1, dtype=torch.float).to(diffs.device), diffs, atol=2e-4
+        ):
+            print(
+                "WARNING : all replicas don't have the same target output - returning all outputs"
+            )
             return all_relevances, outputs
         return all_relevances, torch.mean(outputs)
 
@@ -402,7 +424,7 @@ def take_most_relevant_walks(relevances, n_ats_per_walk=None, n_walks=50):
     # only consider n_atoms-walks
     if n_ats_per_walk is not None:
         relevances_tmp = []
-        for walk_id, (walk, relevance) in enumerate (relevances):
+        for walk_id, (walk, relevance) in enumerate(relevances):
             if len(set(walk)) == n_ats_per_walk:
                 relevances_tmp.append((walk, relevance))
     else:
@@ -423,7 +445,7 @@ def scale_by_max(relevances):
     """
     max_abs_rel = max([abs(rel) for _, rel in relevances])
     # scale by max:
-    relevances = [(walk, rel/max_abs_rel) for walk, rel in relevances]
+    relevances = [(walk, rel / max_abs_rel) for walk, rel in relevances]
     return relevances
 
 
@@ -437,6 +459,7 @@ def get_hop_relevances(all_relevances):
                 hops.append([prev_node, node])
             prev_node = node
         return hops
+
     ###################################################
 
     relevances_tmp = []
@@ -480,7 +503,9 @@ def get_bond_relevance(all_relevances, obmol, rdkmol):
     # 1. step: define list of tuples (hop, walk_relevance)
     relevances_tmp = get_hop_relevances(all_relevances)
     # 2. step: define list of tuples (bond_order, walk_relevance)
-    relevances_tmp = get_bond_order_relevance(relevances_tmp, _atom_list, _aromatic_list)
+    relevances_tmp = get_bond_order_relevance(
+        relevances_tmp, _atom_list, _aromatic_list
+    )
     return relevances_tmp
 
 
@@ -493,11 +518,11 @@ def get_bond_order_relevance(relevances, atom_list, aromatic_list):
         bond = at_i.GetBond(at_j)
         if bond is None:
             if hop[0] == hop[1]:
-                bond_order = -1     # code for self loop
+                bond_order = -1  # code for self loop
             else:
-                bond_order = 0      # code for no bond
+                bond_order = 0  # code for no bond
         elif aromatic_list[hop[0]] and aromatic_list[hop[0]]:
-            bond_order = 1.5    # code for aromatic
+            bond_order = 1.5  # code for aromatic
         else:
             bond_order = bond.GetBondOrder()
         relevances_tmp.append((bond_order, relevance))
