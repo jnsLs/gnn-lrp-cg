@@ -81,7 +81,7 @@ class ProcessRelevance:
         if walk is not None:
             mask = torch.zeros(x.shape).to(self.device)
             # multi-walk interpretation
-            if isinstance(walk[0], tuple):
+            if isinstance(walk[0], tuple) or isinstance(walk[0], list):
                 assert len(inputs[properties.n_atoms]) == len(
                     walk
                 ), "Input data must contain as many collated frames as input walks"
@@ -102,7 +102,7 @@ class ProcessRelevance:
             if walk is not None:
                 mask = torch.zeros(x.shape).to(self.device)
                 # multi-walk interpretation
-                if isinstance(walk[0], tuple):
+                if isinstance(walk[0], tuple) or isinstance(walk[0], list):
                     offset = 0
                     for i, w in enumerate(walk):
                         mask[w[layer_idx + 1] + offset] = 1
@@ -152,7 +152,7 @@ class ProcessRelevance:
         if walk is not None:
             mask = torch.zeros(q.shape).to(self.device)
             # multi-walk interpretation
-            if isinstance(walk[0], tuple):
+            if isinstance(walk[0], tuple) or isinstance(walk[0], list):
                 assert len(inputs[properties.n_atoms]) == len(
                     walk
                 ), "Input data must contain as many collated frames as input walks"
@@ -165,12 +165,12 @@ class ProcessRelevance:
                 mask[walk[0]] = 1
             q = q * mask + (1 - mask) * q.data
 
-        for i, (interaction, mixing) in enumerate(
+        for layer_idx, (interaction, mixing) in enumerate(
             zip(
                 self.model.representation.interactions, self.model.representation.mixing
             )
         ):
-            q, mu = interaction(q, mu, filter_list[i], dir_ij, idx_i, idx_j, n_atoms)
+            q, mu = interaction(q, mu, filter_list[layer_idx], dir_ij, idx_i, idx_j, n_atoms)
 
             if walk is not None:
                 mixing.zero_grad()
@@ -178,14 +178,14 @@ class ProcessRelevance:
 
                 mask = torch.zeros(q.shape).to(self.device)
                 # multi-walk interpretation
-                if isinstance(walk[0], tuple):
+                if isinstance(walk[0], tuple) or isinstance(walk[0], list):
                     offset = 0
                     for i, w in enumerate(walk):
-                        mask[w[i + 1] + offset] = 1
+                        mask[w[layer_idx + 1] + offset] = 1
                         offset += inputs[properties.n_atoms][i]
                 # single-walk interpretation
                 else:
-                    mask[walk[i + 1]] = 1
+                    mask[walk[layer_idx + 1]] = 1
                 q = q * mask + (1 - mask) * q.data
 
             else:
@@ -225,7 +225,7 @@ class ProcessRelevance:
         if walk is not None:
             mask = torch.zeros(x0.shape).to(self.device)
             # multi-walk interpretation
-            if isinstance(walk[0], tuple):
+            if isinstance(walk[0], tuple) or isinstance(walk[0], list):
                 assert len(inputs[properties.n_atoms]) == len(
                     walk
                 ), "Input data must contain as many collated frames as input walks"
@@ -258,7 +258,7 @@ class ProcessRelevance:
             if walk is not None:
                 mask = torch.zeros(q.shape).to(self.device)
                 # multi-walk interpretation
-                if isinstance(walk[0], tuple):
+                if isinstance(walk[0], tuple) or isinstance(walk[0], list):
                     offset = 0
                     for i, w in enumerate(walk):
                         mask[w[layer_idx + 1] + offset] = 1
@@ -384,7 +384,7 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
             inputs = self.model.postprocess(inputs)
 
             y = inputs[self.target]
-            outputs.append(y)
+            outputs.append(y.detach().cpu())
 
             # backward pass
             torch.sum(y).backward(retain_graph=True)
