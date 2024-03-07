@@ -355,7 +355,6 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
             inputs = sample
 
         all_relevances = []
-        outputs = []
         # divide walks into batches
         walk_batches = list(chunker(all_walks, batchsize))
         for walks in walk_batches:
@@ -384,7 +383,6 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
             inputs = self.model.postprocess(inputs)
 
             y = inputs[self.target]
-            outputs.append(y.detach().cpu())
 
             # backward pass
             torch.sum(y).backward(retain_graph=True)
@@ -405,16 +403,7 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
 
             # reset grad
             h0.grad.data.zero_()
-        outputs = torch.cat(outputs)
-        diffs = torch.diff(outputs)
-        if not torch.allclose(
-            torch.zeros(1, dtype=torch.float).to(diffs.device), diffs, atol=2e-4
-        ):
-            print(
-                "WARNING : all replicas don't have the same target output - returning all outputs"
-            )
-            return all_relevances, outputs
-        return all_relevances, torch.mean(outputs)
+        return all_relevances, y[-1]
 
 
 ###############################################################################
