@@ -5,6 +5,7 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 import torch.nn.functional as F
+from tqdm import tqdm
 
 from schnetpack import properties
 import schnetpack.nn.so3 as so3
@@ -354,10 +355,12 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
         else:
             inputs = sample
 
-        all_relevances = []
+        n_atoms_per_walk = len(all_walks[0])
+        all_relevances = np.zeros((len(all_walks), n_atoms_per_walk+1))
         # divide walks into batches
         walk_batches = list(chunker(all_walks, batchsize))
-        for walks in walk_batches:
+        walk_idx = 0
+        for walks in tqdm(walk_batches, mininterval=100):
             # the last batch might be smaller than the rest
             # thus we need to collate the data again
             if len(walks) < batchsize:
@@ -391,12 +394,18 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
             relevances = h0.data.cpu() * h0.grad.data.cpu()
             if single_walk:
                 relevance = relevances.sum().item()
-                all_relevances.append((walks, relevance))
+                all_relevances[walk_idx, :n_atoms_per_walk] = walk
+                all_relevances[walk_idx, -1] = relevance
+                walk_idx += 1
+                # all_relevances.append((walks, relevance))
             else:
                 n_0, n_1 = 0, inputs[properties.n_atoms][0].item()
                 for i, w in enumerate(walks):
                     relevance = relevances[n_0:n_1].sum().item()
-                    all_relevances.append((w, relevance))
+                    all_relevances[walk_idx, :n_atoms_per_walk] = w
+                    all_relevances[walk_idx, -1] = relevance
+                    walk_idx += 1
+                    # all_relevances.append((w, relevance))
                     n_0 += inputs[properties.n_atoms][i]
                     if i != len(walks) - 1:
                         n_1 += inputs[properties.n_atoms][i + 1].item()
