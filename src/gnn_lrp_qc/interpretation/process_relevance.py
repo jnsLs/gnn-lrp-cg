@@ -394,7 +394,7 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
             relevances = h0.data.cpu() * h0.grad.data.cpu()
             if single_walk:
                 relevance = relevances.sum().item()
-                all_relevances[walk_idx, :n_atoms_per_walk] = walk
+                all_relevances[walk_idx, :n_atoms_per_walk] = walks
                 all_relevances[walk_idx, -1] = relevance
                 walk_idx += 1
                 # all_relevances.append((walks, relevance))
