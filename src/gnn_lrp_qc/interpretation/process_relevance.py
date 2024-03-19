@@ -5,6 +5,7 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 import torch.nn.functional as F
+from tqdm import tqdm
 
 from schnetpack import properties
 import schnetpack.nn.so3 as so3
@@ -70,8 +71,13 @@ class ProcessRelevance:
 
         # do masking
         if walk is not None:
-            mask = torch.zeros(x.shape).to(self.device)
-            mask[walk[0]] = 1
+            if walk[0] == -1: 
+                mask = torch.ones(x.shape).to(self.device)
+                walk_arr = np.array(walk)
+                mask[walk_arr[walk_arr>=0]] = 0
+            else:
+                mask = torch.zeros(x.shape).to(self.device)
+                mask[walk[0]] = 1
             x = x * mask + (1 - mask) * x.data
 
         # compute interaction block to update atomic embeddings
@@ -80,8 +86,13 @@ class ProcessRelevance:
             x = x + v
 
             if walk is not None:
-                mask = torch.zeros(x.shape).to(self.device)
-                mask[walk[layer_idx + 1]] = 1
+                if walk[layer_idx + 1] == -1:
+                    mask = torch.ones(x.shape).to(self.device)
+                    walk_arr = np.array(walk)
+                    mask[walk_arr[walk_arr>=0]] = 0
+                else:
+                    mask = torch.zeros(x.shape).to(self.device)
+                    mask[walk[layer_idx + 1]] = 1
                 x = x * mask + (1 - mask) * x.data
 
         inputs["scalar_representation"] = x
@@ -118,22 +129,32 @@ class ProcessRelevance:
 
         # do masking
         if walk is not None:
-            mask = torch.zeros(q.shape).to(self.device)
-            mask[walk[0]] = 1
+            if walk[0] == -1: 
+                mask = torch.ones(q.shape).to(self.device)
+                walk_arr = np.array(walk)
+                mask[walk_arr[walk_arr>=0]] = 0
+            else:
+                mask = torch.zeros(q.shape).to(self.device)
+                mask[walk[0]] = 1
             q = q * mask + (1 - mask) * q.data
 
-        for i, (interaction, mixing) in enumerate(
+        for layer_idx, (interaction, mixing) in enumerate(
                 zip(self.model.representation.interactions, self.model.representation.mixing)
         ):
-            q, mu = interaction(q, mu, filter_list[i], dir_ij, idx_i, idx_j, n_atoms)
+            q, mu = interaction(q, mu, filter_list[layer_idx], dir_ij, idx_i, idx_j, n_atoms)
 
             if walk is not None:
 
                 mixing.zero_grad()
                 q, _ = mixing(q, mu)
 
-                mask = torch.zeros(q.shape).to(self.device)
-                mask[walk[i + 1]] = 1
+                if walk[layer_idx + 1] == -1:
+                    mask = torch.ones(q.shape).to(self.device)
+                    walk_arr = np.array(walk)
+                    mask[walk_arr[walk_arr>=0]] = 0
+                else:
+                    mask = torch.zeros(q.shape).to(self.device)
+                    mask[walk[layer_idx + 1]] = 1
                 q = q * mask + (1 - mask) * q.data
 
             else:
@@ -272,7 +293,7 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
         inputs = sample
 
         all_relevances = []
-        for walk in all_walks:
+        for walk in tqdm(all_walks):
 
             # reset grad
             self.model.zero_grad()
