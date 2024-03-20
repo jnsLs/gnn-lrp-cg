@@ -82,7 +82,7 @@ class ProcessRelevance:
         if walk is not None:
             mask = torch.zeros(x.shape).to(self.device)
             # multi-walk interpretation
-            if isinstance(walk[0], tuple) or isinstance(walk[0], list):
+            if isinstance(walk[0], tuple) or isinstance(walk[0], list) or isinstance(walk[0], np.ndarray):
                 assert len(inputs[properties.n_atoms]) == len(
                     walk
                 ), "Input data must contain as many collated frames as input walks"
@@ -103,7 +103,7 @@ class ProcessRelevance:
             if walk is not None:
                 mask = torch.zeros(x.shape).to(self.device)
                 # multi-walk interpretation
-                if isinstance(walk[0], tuple) or isinstance(walk[0], list):
+                if isinstance(walk[0], tuple) or isinstance(walk[0], list) or isinstance(walk[0], np.ndarray):
                     offset = 0
                     for i, w in enumerate(walk):
                         mask[w[layer_idx + 1] + offset] = 1
@@ -153,7 +153,7 @@ class ProcessRelevance:
         if walk is not None:
             mask = torch.zeros(q.shape).to(self.device)
             # multi-walk interpretation
-            if isinstance(walk[0], tuple) or isinstance(walk[0], list):
+            if isinstance(walk[0], tuple) or isinstance(walk[0], list) or isinstance(walk[0], np.ndarray):
                 assert len(inputs[properties.n_atoms]) == len(
                     walk
                 ), "Input data must contain as many collated frames as input walks"
@@ -179,7 +179,7 @@ class ProcessRelevance:
 
                 mask = torch.zeros(q.shape).to(self.device)
                 # multi-walk interpretation
-                if isinstance(walk[0], tuple) or isinstance(walk[0], list):
+                if isinstance(walk[0], tuple) or isinstance(walk[0], list) or isinstance(walk[0], np.ndarray):
                     offset = 0
                     for i, w in enumerate(walk):
                         mask[w[layer_idx + 1] + offset] = 1
@@ -226,7 +226,7 @@ class ProcessRelevance:
         if walk is not None:
             mask = torch.zeros(x0.shape).to(self.device)
             # multi-walk interpretation
-            if isinstance(walk[0], tuple) or isinstance(walk[0], list):
+            if isinstance(walk[0], tuple) or isinstance(walk[0], list) or isinstance(walk[0], np.ndarray):
                 assert len(inputs[properties.n_atoms]) == len(
                     walk
                 ), "Input data must contain as many collated frames as input walks"
@@ -259,7 +259,7 @@ class ProcessRelevance:
             if walk is not None:
                 mask = torch.zeros(q.shape).to(self.device)
                 # multi-walk interpretation
-                if isinstance(walk[0], tuple) or isinstance(walk[0], list):
+                if isinstance(walk[0], tuple) or isinstance(walk[0], list) or isinstance(walk[0], np.ndarray):
                     offset = 0
                     for i, w in enumerate(walk):
                         mask[w[layer_idx + 1] + offset] = 1
