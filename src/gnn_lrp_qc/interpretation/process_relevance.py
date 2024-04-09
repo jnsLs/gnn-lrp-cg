@@ -142,12 +142,10 @@ class ProcessRelevance:
                 zip(self.model.representation.interactions, self.model.representation.mixing)
         ):
             q, mu = interaction(q, mu, filter_list[layer_idx], dir_ij, idx_i, idx_j, n_atoms)
+            mu = mu.detach()
+            q, mu = mixing(q, mu)
 
             if walk is not None:
-
-                mixing.zero_grad()
-                q, _ = mixing(q, mu)
-
                 if walk[layer_idx + 1] == -1:
                     mask = torch.ones(q.shape).to(self.device)
                     walk_arr = np.array(walk)
@@ -156,9 +154,6 @@ class ProcessRelevance:
                     mask = torch.zeros(q.shape).to(self.device)
                     mask[walk[layer_idx + 1]] = 1
                 q = q * mask + (1 - mask) * q.data
-
-            else:
-                q, mu = mixing(q, mu)
 
         q = q.squeeze(1)
 
