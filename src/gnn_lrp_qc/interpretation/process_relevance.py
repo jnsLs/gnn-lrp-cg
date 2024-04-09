@@ -172,11 +172,10 @@ class ProcessRelevance:
             )
         ):
             q, mu = interaction(q, mu, filter_list[layer_idx], dir_ij, idx_i, idx_j, n_atoms)
+            mu = mu.detach()
+            q, mu = mixing(q, mu)
 
             if walk is not None:
-                mixing.zero_grad()
-                q, _ = mixing(q, mu)
-
                 mask = torch.zeros(q.shape).to(self.device)
                 # multi-walk interpretation
                 if isinstance(walk[0], tuple) or isinstance(walk[0], list) or isinstance(walk[0], np.ndarray):
@@ -188,9 +187,6 @@ class ProcessRelevance:
                 else:
                     mask[walk[layer_idx + 1]] = 1
                 q = q * mask + (1 - mask) * q.data
-
-            else:
-                q, mu = mixing(q, mu)
 
         q = q.squeeze(1)
 
