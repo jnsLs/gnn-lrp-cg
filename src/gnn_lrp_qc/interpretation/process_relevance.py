@@ -12,18 +12,78 @@ from gnn_lrp_qc.utils.molecular_graph import get_all_walks
 
 
 def xai_forward(self, input: torch.Tensor):
+    #y = F.linear(input, self.weight, self.bias)
+    #y = y * (self.activation(y) / y).detach()
+
+    # We use the rule where we normalize the relevance either by
+    # the bias or by the sum over the activations
     y = F.linear(input, self.weight, self.bias)
-    y = y * (self.activation(y) / y).detach()
-    return y
+    y = self.activation(y)
+
+    # positive output
+    yp = F.linear(input.clamp(0),
+                  self.weight + self.gamma * self.weight.clamp(0),
+                  self.bias + self.gamma * self.bias.clamp(0))  # positive activation
+    yp += F.linear(-(-input).clamp(0),
+                   self.weight + self.gamma * -(-self.weight).clamp(0))  # negative activation
+    yp *= (y > 1e-6).float()
+
+    # Now the denominator
+    ypb = F.linear(input.clamp(0),
+                   self.weight + self.gamma * self.weight.clamp(0))  # positive activation
+    ypb += F.linear(-(-input).clamp(0),
+                    self.weight + self.gamma * -(-self.weight).clamp(0))  # negative activation
+
+    # max bias rule
+    renormalization_factor_p = torch.vstack(ypb.shape[0] * [self.bias + self.gamma * self.bias.clamp(0)])
+    renormalization_factor_p = renormalization_factor_p.view(ypb.shape)
+    ypb = torch.maximum(ypb, renormalization_factor_p)
+
+    ypb *= (y > 1e-6).float()
+
+    # negative output
+    ym = F.linear(input.clamp(0),
+                  self.weight + self.gamma * (-(-self.weight).clamp(0)),
+                  self.bias + self.gamma * (-(-self.bias).clamp(0)))  # positive activation
+
+    ym += F.linear(-(-input).clamp(0),
+                   self.weight + self.gamma * self.weight.clamp(0))  # negative activation
+    ym *= (y < -1e-6).float()
+
+    # And the denominator
+    ymb = F.linear(input.clamp(0),
+                   self.weight + self.gamma * (-(-self.weight).clamp(0)))  # positive activation
+    ymb += F.linear(-(-input).clamp(0),
+                    self.weight + self.gamma * self.weight.clamp(0))  # negative activation
+
+    # max bias rule
+    renormalization_factor_m = torch.vstack(ypb.shape[0] * [self.bias + self.gamma * (-(-self.bias).clamp(0))])
+    renormalization_factor_m = renormalization_factor_m.view(ymb.shape)
+    ymb = torch.minimum(ymb, renormalization_factor_m)
+
+    ymb *= (y < -1e-6).float()
+
+    # Add positiv and negative up
+    yo = yp + ym
+    yob = ypb + ymb
+
+    out = yo * torch.nan_to_num(y / yob).detach()
+    return out
 
 
 def apply_quotient_rule(model):
     for name, module in model.named_children():
         if isinstance(module, nn.Module):
             # If the module is a submodule, check its children recursively
-            if hasattr(module, 'activation') and (module.activation is nn.Identity or module.activation is not None):
+            if (
+                    hasattr(module, 'activation') and
+                    module.activation is not None and
+                    type(module.activation) is not type(nn.Identity())
+            ):
+
                 print(f"{module.__class__.__name__} {name} has non-None activation: {module.activation}")
                 module.forward = types.MethodType(xai_forward, module)
+                module.gamma = 0.1
             apply_quotient_rule(module)
 
 
@@ -125,9 +185,11 @@ class ProcessRelevance:
         for i, (interaction, mixing) in enumerate(
                 zip(self.model.representation.interactions, self.model.representation.mixing)
         ):
+            mu = mu.detach()
             q, mu = interaction(q, mu, filter_list[i], dir_ij, idx_i, idx_j, n_atoms)
             mu = mu.detach()
             q, mu = mixing(q, mu)
+            mu = mu.detach()
 
             if walk is not None:
                 mask = torch.zeros(q.shape).to(self.device)
