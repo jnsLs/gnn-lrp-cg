@@ -20,40 +20,102 @@ def xai_forward(self, input: torch.Tensor):
     return y
 
 
-def apply_quotient_rule(model):
+def xai_forward_bias_rule(self, input: torch.Tensor):
+    # We use the rule where we normalize the relevance either by
+    # the bias or by the sum over the activations
+    y = F.linear(input, self.weight, self.bias)
+    y = self.activation(y)
+
+    # positive output
+    yp = F.linear(input.clamp(0),
+                  self.weight + self.gamma * self.weight.clamp(0),
+                  self.bias + self.gamma * self.bias.clamp(0))  # positive activation
+    yp += F.linear(-(-input).clamp(0),
+                   self.weight + self.gamma * -(-self.weight).clamp(0))  # negative activation
+    yp *= (y > 1e-6).float()
+
+    # Now the denominator
+    ypb = F.linear(input.clamp(0),
+                   self.weight + self.gamma * self.weight.clamp(0))  # positive activation
+    ypb += F.linear(-(-input).clamp(0),
+                    self.weight + self.gamma * -(-self.weight).clamp(0))  # negative activation
+
+    # max bias rule
+    renormalization_factor_p = torch.vstack(ypb.shape[0] * [self.bias + self.gamma * self.bias.clamp(0)])
+    renormalization_factor_p = renormalization_factor_p.view(ypb.shape)
+    ypb = torch.maximum(ypb, renormalization_factor_p)
+
+    ypb *= (y > 1e-6).float()
+
+    # negative output
+    ym = F.linear(input.clamp(0),
+                  self.weight + self.gamma * (-(-self.weight).clamp(0)),
+                  self.bias + self.gamma * (-(-self.bias).clamp(0)))  # positive activation
+
+    ym += F.linear(-(-input).clamp(0),
+                   self.weight + self.gamma * self.weight.clamp(0))  # negative activation
+    ym *= (y < -1e-6).float()
+
+    # And the denominator
+    ymb = F.linear(input.clamp(0),
+                   self.weight + self.gamma * (-(-self.weight).clamp(0)))  # positive activation
+    ymb += F.linear(-(-input).clamp(0),
+                    self.weight + self.gamma * self.weight.clamp(0))  # negative activation
+
+    # max bias rule
+    renormalization_factor_m = torch.vstack(ypb.shape[0] * [self.bias + self.gamma * (-(-self.bias).clamp(0))])
+    renormalization_factor_m = renormalization_factor_m.view(ymb.shape)
+    ymb = torch.minimum(ymb, renormalization_factor_m)
+
+    ymb *= (y < -1e-6).float()
+
+    # Add positiv and negative up
+    yo = yp + ym
+    yob = ypb + ymb
+
+    out = yo * torch.nan_to_num(y / yob).detach()
+    return out
+
+
+def apply_quotient_rule(model, forward_rule, gamma):
     for name, module in model.named_children():
         if isinstance(module, nn.Module):
             # If the module is a submodule, check its children recursively
-            if hasattr(module, "activation") and (
-                module.activation is nn.Identity or module.activation is not None
+            if (
+                    hasattr(module, 'activation') and
+                    module.activation is not None and
+                    type(module.activation) is not type(nn.Identity())
             ):
-                print(
-                    f"{module.__class__.__name__} {name} has non-None activation: {module.activation}"
-                )
-                module.forward = types.MethodType(xai_forward, module)
-            apply_quotient_rule(module)
+
+                print(f"{module.__class__.__name__} {name} has non-None activation: {module.activation}")
+                module.forward = types.MethodType(forward_rule, module)
+                module.gamma = gamma
+            apply_quotient_rule(module, forward_rule, gamma=gamma)
 
 
 class ProcessRelevance:
-    def __init__(self, model, device, target, gamma, zero_bias=False):
+    def __init__(self, model, device, target, gamma=0.1, use_bias_rule_and_gamma=True, zero_bias=False):
         self.target = target
         self.gamma = gamma
         self.device = device
 
-        apply_quotient_rule(model)
-        self.model = model
-        architecture_name = model.representation.__class__.__name__
+        if use_bias_rule_and_gamma:
+            forward_rule = xai_forward_bias_rule
+        else:
+            forward_rule = xai_forward
+        apply_quotient_rule(model, forward_rule, gamma=gamma)
 
-        if architecture_name == "SchNet":
+        self.model = model
+        self.architecture_name = model.representation.__class__.__name__
+
+        if self.architecture_name == "SchNet":
             self.representation_forward = self.schnet_forward
-        elif architecture_name == "PaiNN":
+        elif self.architecture_name == "PaiNN":
             self.representation_forward = self.painn_forward
-        elif architecture_name == "SO3net":
+        elif self.architecture_name == "SO3net":
             self.representation_forward = self.so3net_forward
         else:
-            raise NotImplementedError(
-                f"Architecture {architecture_name} not implemented."
-            )
+            raise NotImplementedError(f"Architecture {self.architecture_name} not implemented.")
 
         self._zero_bias() if zero_bias else None
 
@@ -171,9 +233,11 @@ class ProcessRelevance:
                 self.model.representation.interactions, self.model.representation.mixing
             )
         ):
+            mu = mu.detach()
             q, mu = interaction(q, mu, filter_list[layer_idx], dir_ij, idx_i, idx_j, n_atoms)
             mu = mu.detach()
             q, mu = mixing(q, mu)
+            mu = mu.detach()
 
             if walk is not None:
                 mask = torch.zeros(q.shape).to(self.device)
@@ -237,13 +301,14 @@ class ProcessRelevance:
 
         x = so3.scalar2rsh(x0, int(self.model.representation.lmax))
 
-        for so3conv, mixing1, mixing2, gating, mixing3 in zip(
-            self.model.representation.so3convs,
-            self.model.representation.mixings1,
-            self.model.representation.mixings2,
-            self.model.representation.gatings,
-            self.model.representation.mixings3,
-        ):
+        for layer_idx, (so3conv, mixing1, mixing2, gating, mixing3) in enumerate(zip(
+                    self.model.representation.so3convs,
+                    self.model.representation.mixings1,
+                    self.model.representation.mixings2,
+                    self.model.representation.gatings,
+                    self.model.representation.mixings3
+
+        )):
             dx = so3conv(x, radial_ij, Yij, cutoff_ij, idx_i, idx_j)
             ddx = mixing1(dx)
             dx = dx + self.model.representation.so3product(dx, ddx)
@@ -252,8 +317,13 @@ class ProcessRelevance:
             dx = mixing3(dx)
             x = x + dx
 
+            # only explain scalar features (detach the rest)
+            scalar_feat_mask = torch.zeros_like(x)
+            scalar_feat_mask[:, 0] = 1
+            x = x * scalar_feat_mask + (1 - scalar_feat_mask) * x.data
+
             if walk is not None:
-                mask = torch.zeros(q.shape).to(self.device)
+                mask = torch.zeros(x[:, 0].shape).to(self.device)
                 # multi-walk interpretation
                 if isinstance(walk[0], tuple) or isinstance(walk[0], list) or isinstance(walk[0], np.ndarray):
                     offset = 0
@@ -263,7 +333,7 @@ class ProcessRelevance:
                 # single-walk interpretation
                 else:
                     mask[walk[layer_idx + 1]] = 1
-                q = q * mask + (1 - mask) * q.data
+                x[:, 0] = x[:, 0] * mask + (1 - mask) * x[:, 0].data
 
         inputs["scalar_representation"] = x[:, 0]
         inputs["multipole_representation"] = x
@@ -281,9 +351,10 @@ class ProcessRelevance:
 
 
 class ProcessRelevancePope(ProcessRelevance):
-    def __init__(self, model, device, target, gamma, zero_bias=False):
+
+    def __init__(self, model, device, target, gamma=0.1, use_bias_rule_and_gamma=True, zero_bias=False):
         super(ProcessRelevancePope, self).__init__(
-            model, device, target, gamma, zero_bias=zero_bias
+            model, device, target, gamma, use_bias_rule_and_gamma, zero_bias=zero_bias
         )
 
     def process(self, sample):
@@ -317,9 +388,10 @@ class ProcessRelevancePope(ProcessRelevance):
 
 
 class ProcessRelevanceGNNLRP(ProcessRelevance):
-    def __init__(self, model, device, target, gamma, zero_bias=False):
+
+    def __init__(self, model, device, target, gamma=0.1, use_bias_rule_and_gamma=True, zero_bias=False):
         super(ProcessRelevanceGNNLRP, self).__init__(
-            model, device, target, gamma, zero_bias=zero_bias
+            model, device, target, gamma, use_bias_rule_and_gamma, zero_bias=zero_bias
         )
 
     def process(self, sample, all_walks=None, batchsize=1):
@@ -334,9 +406,10 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
 
         if all_walks is None:
             # No pre-information given, so let's compute all possible walks.
-            all_walks = get_all_walks(
-                len(self.model.representation.interactions) + 1, adj, self_loops=True
-            )
+            if self.architecture_name == "SO3net":
+                all_walks = get_all_walks(len(self.model.representation.so3convs) + 1, adj, self_loops=True)
+            else:
+                all_walks = get_all_walks(len(self.model.representation.interactions) + 1, adj, self_loops=True)
 
         # collate inputs to match batchsize
         if batchsize > 1:

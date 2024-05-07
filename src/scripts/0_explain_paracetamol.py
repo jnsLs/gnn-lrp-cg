@@ -19,12 +19,14 @@ from gnn_lrp_qc.utils.visualization import relevance_vis_2d
 # set up relevance calculation parameters
 device = "cuda"
 target_property = "energy_U0"
-#modelpath = "/home/jonas/Documents/3-xai/saved_models/qm9_new_schnet_2_5/best_inference_model"     # schnet
-modelpath = "/home/jonas/Documents/6-xai-cg/training/runs/8ef4a808-da1f-11ee-ab06-a86daa816ce9/best_model"  # painn
+modelpath = "/home/jonas/Documents/3-xai/saved_models/qm9_new_schnet_2_5/best_inference_model"     # schnet
+#modelpath = "/home/jonas/Documents/6-xai-cg/training/runs/8ef4a808-da1f-11ee-ab06-a86daa816ce9/best_model"  # painn
 #modelpath = "/home/jonas/Documents/6-xai-cg/training/runs/0ae983dc-da36-11ee-af00-a86daa816ce9/best_model"  # so3net
 smiles = "CC(=O)NC1=CC=C(C=C1)O"    # paracetamol
 RelevanceProcessor = ProcessRelevanceGNNLRP
 zero_bias = False
+gamma = 0.1
+use_bias_rule_and_gamma = True
 
 # Set up parameters visualization
 aggregate = False
@@ -60,7 +62,9 @@ atoms_converter = spk.interfaces.AtomsConverter(
 sample = atoms_converter(at)
 
 # process relevances
-pr = RelevanceProcessor(model, device, target_property, gamma=0.0, zero_bias=zero_bias)
+pr = RelevanceProcessor(
+    model, device, target_property, gamma=gamma, use_bias_rule_and_gamma=use_bias_rule_and_gamma, zero_bias=zero_bias
+)
 relevances, y = pr.process(sample)
 
 r_tot = 0.0
