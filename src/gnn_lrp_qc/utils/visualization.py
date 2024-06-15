@@ -65,7 +65,11 @@ def relevance_vis_2d(
         selfloopwidth = 0.32
         linewidth = 13.0
         # start iteration over walks
-        for walk_id, (walk, relevance) in enumerate(relevances):
+        for walk_id, concat_relevance in enumerate(relevances):
+            walk = concat_relevance[:-1].tolist()
+            # convert walk entries to integers
+            walk = [int(node) for node in walk]
+            relevance = concat_relevance[-1]
             # get walk color
             if cmap is not None:
                 color = cmap(relevance)

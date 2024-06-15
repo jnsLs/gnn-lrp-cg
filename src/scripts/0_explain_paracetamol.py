@@ -65,16 +65,16 @@ sample = atoms_converter(at)
 pr = RelevanceProcessor(
     model, device, target_property, gamma=gamma, use_bias_rule_and_gamma=use_bias_rule_and_gamma, zero_bias=zero_bias
 )
-relevances, y = pr.process(sample)
+relevances, y = pr.process(sample, batchsize=100)#, all_walks=all_walks)
 
 r_tot = 0.0
-for _, r in relevances:
-    r_tot += r
+for r in relevances:
+    r_tot += r[-1]
 
 print("total relevance: ", r_tot, "\n", "model output: ", y.item())
 
-if aggregate:
-    relevances = select_and_perform_post_processing(relevances, "aggregate", None)
+#if aggregate:
+#    relevances = select_and_perform_post_processing(relevances, "aggregate", None)
 
 # VISUALIZE
 # embed molecule structure
