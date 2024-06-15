@@ -10,6 +10,8 @@ from schnetpack import properties
 import schnetpack.nn.so3 as so3
 from gnn_lrp_qc.utils.molecular_graph import get_all_walks
 
+from tqdm import tqdm
+
 
 def xai_forward(self, input: torch.Tensor):
     y = F.linear(input, self.weight, self.bias)
@@ -347,7 +349,7 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
         inputs = sample
 
         all_relevances = []
-        for walk in all_walks:
+        for walk in tqdm(all_walks):
 
             # reset grad
             self.model.zero_grad()

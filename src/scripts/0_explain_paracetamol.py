@@ -16,9 +16,12 @@ from gnn_lrp_qc.utils.visualization import relevance_vis_2d
 # set up relevance calculation parameters
 device = "cuda"
 target_property = "energy_U0"
-modelpath = "/home/jonas/Documents/3-xai/saved_models/qm9_new_schnet_2_5/best_inference_model"     # schnet
+#modelpath = "/home/jonas/Documents/3-xai/saved_models/qm9_new_schnet_2_5/best_inference_model"     # schnet
+#modelpath = "/home/jonas/Documents/cluster/xai_cg/runs/qm9/schnet_U0/best_model"
 #modelpath = "/home/jonas/Documents/6-xai-cg/training/runs/8ef4a808-da1f-11ee-ab06-a86daa816ce9/best_model"  # painn
+modelpath = "/home/jonas/Documents/cluster/xai_cg/runs/qm9/painn_U0/best_model"  # painn
 #modelpath = "/home/jonas/Documents/6-xai-cg/training/runs/0ae983dc-da36-11ee-af00-a86daa816ce9/best_model"  # so3net
+
 smiles = "CC(=O)NC1=CC=C(C=C1)O"    # paracetamol
 RelevanceProcessor = ProcessRelevanceGNNLRP
 zero_bias = False
@@ -97,4 +100,10 @@ ax = relevance_vis_2d(
     shrinking_factor=1
 )
 plt.axis('off')
+
+# plot relevance distribution
+fig = plt.figure(figsize=(14, 8))
+relevance_values = [r for _, r in relevances]
+plt.hist(relevance_values, bins=50)
+plt.yscale("log")
 plt.show()
