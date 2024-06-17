@@ -395,14 +395,13 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
         )
 
     def process(self, sample, all_walks=None, batchsize=1):
+        # get adjacency matrix (connectivity graph)
         adj = torch.zeros((len(sample[properties.Z]), len(sample[properties.Z])))
         for idx_i, idx_j in zip(sample[properties.idx_i], sample[properties.idx_j]):
             adj[idx_i, idx_j] = 1
             adj[idx_j, idx_i] = 1
         # add diagonal
         adj += torch.eye(len(sample[properties.Z]))
-        #adj = adj.to(self.device) if "cuda" in self.device else None
-        sample["adjacency"] = adj
 
         if all_walks is None:
             # No pre-information given, so let's compute all possible walks.
@@ -466,7 +465,6 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
                 all_relevances[walk_idx, :n_atoms_per_walk] = walks
                 all_relevances[walk_idx, -1] = relevance
                 walk_idx += 1
-                # all_relevances.append((walks, relevance))
             else:
                 n_0, n_1 = 0, inputs[properties.n_atoms][0].item()
                 for i, w in enumerate(walks):
@@ -474,7 +472,6 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
                     all_relevances[walk_idx, :n_atoms_per_walk] = w
                     all_relevances[walk_idx, -1] = relevance
                     walk_idx += 1
-                    # all_relevances.append((w, relevance))
                     n_0 += inputs[properties.n_atoms][i]
                     if i != len(walks) - 1:
                         n_1 += inputs[properties.n_atoms][i + 1].item()

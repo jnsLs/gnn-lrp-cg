@@ -65,7 +65,7 @@ sample = atoms_converter(at)
 pr = RelevanceProcessor(
     model, device, target_property, gamma=gamma, use_bias_rule_and_gamma=use_bias_rule_and_gamma, zero_bias=zero_bias
 )
-relevances, y = pr.process(sample, batchsize=100)#, all_walks=all_walks)
+relevances, y = pr.process(sample, batchsize=10)#, all_walks=all_walks)
 
 r_tot = 0.0
 for r in relevances:
