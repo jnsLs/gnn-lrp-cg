@@ -390,6 +390,7 @@ class ProcessRelevancePope(ProcessRelevance):
 class ProcessRelevanceGNNLRP(ProcessRelevance):
 
     def __init__(self, model, device, target, gamma=0.1, use_bias_rule_and_gamma=True, zero_bias=False):
+        self.n_body = 2
         super(ProcessRelevanceGNNLRP, self).__init__(
             model, device, target, gamma, use_bias_rule_and_gamma, zero_bias=zero_bias
         )
@@ -409,6 +410,12 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
                 all_walks = get_all_walks(len(self.model.representation.so3convs) + 1, adj, self_loops=True)
             else:
                 all_walks = get_all_walks(len(self.model.representation.interactions) + 1, adj, self_loops=True)
+
+        all_walks_tmp = []
+        for walk in all_walks:
+            if len(set(walk)) <= self.n_body:
+                all_walks_tmp.append(walk)
+        all_walks = all_walks_tmp
 
         # collate inputs to match batchsize
         if batchsize > 1:
