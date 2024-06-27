@@ -1,0 +1,12 @@
+mdtraj
+rdkit
+tqdm
+ase
+networkx
+numpy
+h5py
+scipy
+matplotlib
+# developer tools
+black[jupyter]
+
