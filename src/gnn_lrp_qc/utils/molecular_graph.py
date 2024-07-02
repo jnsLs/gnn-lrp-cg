@@ -9,9 +9,11 @@ class Molecule:
     pos: (dim: n_at x 3)
     at_num: (dim: n_at)
     """
-    
+
     def __init__(self, pos, at_num):
-        self.rdkmol, self.con_mat = convert(atoms=at_num.tolist(), xyz_coordinates=pos.tolist(), charge=0)
+        self.rdkmol, self.con_mat = convert(
+            atoms=at_num.tolist(), xyz_coordinates=pos.tolist(), charge=0
+        )
         self.n_nodes = self.rdkmol.GetNumAtoms()
 
     def embed_in_2d(self):
@@ -24,12 +26,13 @@ class Molecule:
             pos.append([conformer_pos.x, conformer_pos.y])
         pos = np.array(pos)
         return pos
-        
-        
+
+
 class Tree(object):
     """
     Reused tree object from stanfordnlp/treelstm.
     """
+
     def __init__(self):
         self.parent = None
         self.num_children = 0
@@ -41,7 +44,7 @@ class Tree(object):
         self.children.append(child)
 
     def size(self):
-        if getattr(self, '_size'):
+        if getattr(self, "_size"):
             return self._size
         count = 1
         for i in xrange(self.num_children):
@@ -50,7 +53,7 @@ class Tree(object):
         return self._size
 
     def depth(self):
-        if getattr(self, '_depth'):
+        if getattr(self, "_depth"):
             return self._depth
         count = 0
         if self.num_children > 0:
@@ -68,7 +71,7 @@ class Tree(object):
             for x in c:
                 yield x
 
-        
+
 def get_all_walks(L, lamb, end_id=None, node_id=None, self_loops=True):
     """
     :param node_id: The id of the node we start with.
@@ -84,25 +87,27 @@ def get_all_walks(L, lamb, end_id=None, node_id=None, self_loops=True):
             tree = tree.parent
             node_seq.append(tree.id)
         return node_seq[::-1]
-    
+
     def get_neighbors(id, lamb):
-        x = torch.zeros(lamb.shape[1],1)
-        x[id,0] = 1.
-        neighbors = lamb.mm(x).nonzero()[:,0]
+        x = torch.zeros(lamb.shape[1], 1)
+        x[id, 0] = 1.0
+        neighbors = lamb.mm(x).nonzero()[:, 0]
         return [int(id) for id in neighbors]
 
     if node_id is None:
         # Multiple start nodes
         num_of_nodes = lamb.shape[1]
-        current_nodes = [None]*num_of_nodes
-        for i in range(num_of_nodes): current_nodes[i] = Tree(); current_nodes[i].id = i
+        current_nodes = [None] * num_of_nodes
+        for i in range(num_of_nodes):
+            current_nodes[i] = Tree()
+            current_nodes[i].id = i
     else:
         # Starting in one node
         root = Tree()
         root.id = node_id
         current_nodes = [root]
 
-    for l in range(L-1):
+    for l in range(L - 1):
         leaf_nodes = []
         for node in current_nodes:
             for neighbor in get_neighbors(node.id, lamb):
@@ -168,17 +173,20 @@ def molecule_distortion(pos_src, stretch_coeff, atom_pair):
     idx1 = atom_pair[1]
 
     # find atoms affected by stretching
-    #dot = torch.matmul(dist_vecs[0, 0], dist_vecs[0, 0].transpose(0, 1))
-    #dot = torch.matmul(dist_vecs[0, idx0], dist_vecs[0, idx0].transpose(0, 1))
-    #affected_atoms = dot[8] > 0.
+    # dot = torch.matmul(dist_vecs[0, 0], dist_vecs[0, 0].transpose(0, 1))
+    # dot = torch.matmul(dist_vecs[0, idx0], dist_vecs[0, idx0].transpose(0, 1))
+    # affected_atoms = dot[8] > 0.
 
-    affected_atoms = torch.tensor([False]*n_atoms, device='cuda:0')
+    affected_atoms = torch.tensor([False] * n_atoms, device="cuda:0")
     affected_atoms[idx1] = True
 
     pos_post = pos_src[0]
     # shift affected atoms
     for idx, is_affected in enumerate(affected_atoms):
         if is_affected:
-            pos_post[idx] = pos_post[idx] + dist_vecs[0, idx1, idx0] / r_ij[0, idx1, idx0] * stretch_coeff
+            pos_post[idx] = (
+                pos_post[idx]
+                + dist_vecs[0, idx1, idx0] / r_ij[0, idx1, idx0] * stretch_coeff
+            )
 
     return graph, pos_post

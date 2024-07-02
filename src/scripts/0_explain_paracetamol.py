@@ -7,7 +7,10 @@ from rdkit.Chem import AllChem
 
 import schnetpack as spk
 from gnn_lrp_qc.interpretation.process_relevance import (
-    ProcessRelevancePope, ProcessRelevanceGNNLRP, filter_by_walk_length, select_and_perform_post_processing
+    ProcessRelevancePope,
+    ProcessRelevanceGNNLRP,
+    filter_by_walk_length,
+    select_and_perform_post_processing,
 )
 from gnn_lrp_qc.utils.molecular_graph import Molecule
 from gnn_lrp_qc.utils.visualization import relevance_vis_2d
@@ -67,12 +70,11 @@ pr = RelevanceProcessor(
 )
 relevances, y = pr.process(sample)
 
-r_tot = 0.
+r_tot = 0.0
 for _, r in relevances:
     r_tot += r
 
-print("total relevance: ", r_tot, "\n",
-      "model output: ", y.item())
+print("total relevance: ", r_tot, "\n", "model output: ", y.item())
 
 if aggregate:
     relevances = select_and_perform_post_processing(relevances, "aggregate", None)
@@ -97,7 +99,7 @@ ax = relevance_vis_2d(
     cmap=None,
     relevance_scaling=0.05,
     scaling_type="root",
-    shrinking_factor=1
+    shrinking_factor=1,
 )
 plt.axis('off')
 
