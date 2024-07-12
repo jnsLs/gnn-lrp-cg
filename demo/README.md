@@ -4,6 +4,8 @@ The model is provided as a schnetpack checkpoint in the `model` folder. As a tes
 
 On our system, running on Debian GNU/Linux 12 (bookworm) and a single NVIDIA RTX A5000 GPU with CUDA 12.5, the interpretation takes about 25 minutes. The pre-and post-processing steps take only a few seconds to run.
 
+Note that if you are running the code on a computer without GPU, the same installation isntructions remain but the interpretation takes about 90 hours on a 2020 MacBook Pro with 2.3 GHz Intel Core i7 four cores.
+
 ## Installation instructions
 
 Before running the demo, please install the following software on a computer with GPU in a fresh python environment:
@@ -30,8 +32,6 @@ Install a few additional packages required for plotting:
 conda install -c conda-forge pandas jupyter ipython
 python -m ipykernel install --user --name cg-lrp-test --display-name "cg-lrp-test"
 ```
-
-Note that if you are running the code on a computer without GPU, the same installation isntructions remain but the interpretation takes about 90 hours on a 2020 MacBook Pro with 2.3 GHz Intel Core i7 four cores.
 
 ## Running instructions
 
