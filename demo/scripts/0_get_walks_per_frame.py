@@ -14,9 +14,12 @@ modelpath = "../model/best_model"
 
 outdir = "../interpretation/walks_per_frame"
 if not os.path.exists(outdir):
-    os.path.mkdir(outdir)
+    os.mkdir(outdir)
 
-device = "cuda"
+if torch.cuda.is_available():
+    device = "cuda"
+else:
+    device = "cpu"
 
 
 # load model
@@ -25,7 +28,10 @@ model.do_postprocessing = False
 cutoff = model.representation.cutoff.item()
 
 #load data
-fns = sorted(glob("../interpretation/frames/frame_*.pkl"))
+if device == "cuda":
+    fns = sorted(glob("../interpretation/frames/frame_*.pkl"))
+else:
+    fns = sorted(glob("../interpretation/frames/cpu_frame_*.pkl"))
 for fn in tqdm(fns):
     frame_id = int(fn.split("/frame_")[-1].split(".pkl")[0])
     if not os.path.exists(os.path.join(outdir, f"frame_{frame_id}")):

@@ -27,11 +27,14 @@ pip install .
 
 Install a few additional packages required for plotting:
 ```
-conda install pandas jupyter ipython
+conda install -c conda-forge pandas jupyter ipython
 python -m ipykernel install --user --name cg-lrp-test --display-name "cg-lrp-test"
 ```
 
-Note that 
+Note that if you are running the code on a computer without GPU, the same installation isntructions remain but make sure to change the `device` variable to `cpu` in the scripts. The lines to modify are:
+
+* line 17 in `0_get_walks_per_frame.py`
+* line 
 
 ## Running instructions
 
@@ -52,7 +55,7 @@ Once the walks are pre-computed, run LRP on each walk:
 ```
 python 1_run_interpretation.py 0
 ```
-The argument `0` computes the interpretation for chunk 0 of frame 0. Should you want to interpret more frames and/or cut the walks in batches, this argument can be changed for parallel runs on different GPUs. For the manuscript, jobs were run on slurm submitting N jobs as a job array with N varying for 0 to N-1.
+The argument `0` computes the interpretation for chunk 0 of frame 0. Should you want to interpret more frames and/or cut the walks in batches, this argument can be changed for parallel runs on different GPUs. For the manuscript, jobs were run on slurm, submitting N jobs as a job array with N varying from 0 to N-1.
 
 Note that depending on the amount of available memory on your GPU the batchsize in the relevance computation (line 55) might have to be adjusted. For reference, the batch size set in the script was set for running on an NVIDIA RTX A5000 with 24GB memory.
 
