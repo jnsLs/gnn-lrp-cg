@@ -366,7 +366,7 @@ class ProcessRelevanceGNNLRP(ProcessRelevance):
             adj[idx_j, idx_i] = 1
         # add diagonal
         adj += torch.eye(len(sample[properties.Z]))
-        adj = adj.to(self.device) if "cuda" in self.device else None
+        adj = adj.to(self.device) 
         sample["adjacency"] = adj
 
         if all_walks is None:
