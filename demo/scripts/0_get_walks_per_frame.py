@@ -33,7 +33,10 @@ if device == "cuda":
 else:
     fns = sorted(glob("../interpretation/frames/cpu_frame_*.pkl"))
 for fn in tqdm(fns):
-    frame_id = int(fn.split("/frame_")[-1].split(".pkl")[0])
+    if device == "cuda":
+        frame_id = int(fn.split("/frame_")[-1].split(".pkl")[0])
+    else:
+        frame_id = int(fn.split("/cpu_frame_")[-1].split(".pkl")[0])
     if not os.path.exists(os.path.join(outdir, f"frame_{frame_id}")):
         os.mkdir(os.path.join(outdir, f"frame_{frame_id}"))
     else:
