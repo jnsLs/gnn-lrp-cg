@@ -31,10 +31,7 @@ conda install -c conda-forge pandas jupyter ipython
 python -m ipykernel install --user --name cg-lrp-test --display-name "cg-lrp-test"
 ```
 
-Note that if you are running the code on a computer without GPU, the same installation isntructions remain but make sure to change the `device` variable to `cpu` in the scripts. The lines to modify are:
-
-* line 17 in `0_get_walks_per_frame.py`
-* line 
+Note that if you are running the code on a computer without GPU, the same installation isntructions remain but the interpretation takes about 90 hours on a 2020 MacBook Pro with 2.3 GHz Intel Core i7 four cores.
 
 ## Running instructions
 
