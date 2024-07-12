@@ -13,6 +13,8 @@ from gnn_lrp_qc.utils.batch import chunker
 modelpath = "../model/best_model"
 
 outdir = "../interpretation/walks_per_frame"
+if not os.path.exists(outdir):
+    os.path.mkdir(outdir)
 
 device = "cuda"
 
