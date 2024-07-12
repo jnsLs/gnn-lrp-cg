@@ -3,5 +3,10 @@ src/gnn_lrp_qc/utils/__pycache__/
 src/gnn_lrp_qc/__pycache__/
 __pycache__/
 .idea
+demo/scripts/__pycache__
 
 src/gnn_lrp_qc.egg-info/
+
+demo/interpretation/relevance_array_so3net_2B_3B_methane_cut_5.6081.pkl
+demo/interpretation/walks_per_frame/frame_0
+demo/interpretation/interpretations_per_frame/interpretation_frame_0_all_walks.npy

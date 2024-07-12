@@ -1,0 +1,1 @@
+For simplicity, only the computed RDF, local angle distribution and tetrahedral order parameter on the pre-run simulations are provided here, as they are only used for comparison to the relevance curves for plotting. To see the raw simulation results and how to run them, see the supplementary data provided with the manuscript.
