@@ -35,7 +35,7 @@ python -m ipykernel install --user --name cg-lrp-test --display-name "cg-lrp-tes
 
 ## Running instructions
 
-This demo shows how to run the interpretation of a single methane frame with the so3net model shown in the manuscript. The methane frame is present as a pickle file (containing a dictionnary in the format readable by SchNetPack) in `demo/interpretation/frames/frame_0.pkl`.
+This demo shows how to run the interpretation of a single methane frame with the so3net model shown in the manuscript. The methane frame is present as a pickle file (containing a dictionary in the format readable by SchNetPack) in `demo/interpretation/frames/frame_0.pkl`.
 
 The scripts to run the different steps of the interpretation are provided in `demo/scripts` and are numbered in the order in which they should be run.
 
@@ -56,7 +56,7 @@ The argument `0` computes the interpretation for chunk 0 of frame 0. Should you 
 
 Note that, depending on the amount of available memory on your GPU, the batchsize in the relevance computation (line 68) might have to be adjusted. For reference, the batch size of 10 set in the script was set for running on an NVIDIA RTX 3090 with 24GB memory.
 
-This script saves a file in `demo/interpretation/interpretations_per_frame` for each frame (and chunk if set) containing the raw relevance output. This is saved in a `.npy` file containing a dictionnary with keys:
+This script saves a file in `demo/interpretation/interpretations_per_frame` for each frame (and chunk if set) containing the raw relevance output. This is saved in a `.npy` file containing a dictionary with keys:
 
 * `relevance` containing an array of shape (n_walks, len(walk)+1) containing for each walk the bead indices of the walk and the corresponding relevance score, 
 * `energy` containing the model output for the interpreted frame.
@@ -66,7 +66,7 @@ This is done through:
 ```
 python 2_process_interpretation.py
 ```
-This script creates a dictionnary with keys `2` and `3` for the 2- and 3-body walks respectively. Each key contains a numpy array with properties for each walk, see the docstring in `2_process_interpretation.py` for more details.
+This script creates a dictionary with keys `2` and `3` for the 2- and 3-body walks respectively. Each key contains a numpy array with properties for each walk, see the docstring in `2_process_interpretation.py` for more details.
 
 The expected result is shown in `demo/interpretation/expected_results.png` and the same plot can be reproduced on your interpretation using `3_plot_interpretation.ipynb`.
 
