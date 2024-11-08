@@ -22,7 +22,71 @@ def xai_forward(self, input: torch.Tensor):
     return y
 
 
+def xai_forward_gen_gamma_rule(self, input: torch.Tensor):
+    # We use the rule where we normalize the relevance either by
+    # the bias or by the sum over the activations
+    y = F.linear(input, self.weight, self.bias)
+    y = self.activation(y)
+
+    # positive output
+    yp = F.linear(input.clamp(0),
+                  self.weight + self.gamma * self.weight.clamp(0),
+                  self.bias + self.gamma * self.bias.clamp(0))  # positive activation
+    yp += F.linear(-(-input).clamp(0),
+                   self.weight + self.gamma * -(-self.weight).clamp(0))  # negative activation
+    yp *= (y > 1e-6).float()
+
+    # Now the denominator
+    ypb = F.linear(input.clamp(0),
+                   self.weight + self.gamma * self.weight.clamp(0))  # positive activation
+    ypb += F.linear(-(-input).clamp(0),
+                    self.weight + self.gamma * -(-self.weight).clamp(0))  # negative activation
+
+    ypb *= (y > 1e-6).float()
+
+    # negative output
+    ym = F.linear(input.clamp(0),
+                  self.weight + self.gamma * (-(-self.weight).clamp(0)),
+                  self.bias + self.gamma * (-(-self.bias).clamp(0)))  # positive activation
+
+    ym += F.linear(-(-input).clamp(0),
+                   self.weight + self.gamma * self.weight.clamp(0))  # negative activation
+    ym *= (y < -1e-6).float()
+
+    # And the denominator
+    ymb = F.linear(input.clamp(0),
+                   self.weight + self.gamma * (-(-self.weight).clamp(0)))  # positive activation
+    ymb += F.linear(-(-input).clamp(0),
+                    self.weight + self.gamma * self.weight.clamp(0))  # negative activation
+
+    ymb *= (y < -1e-6).float()
+
+    # Add positiv and negative up
+    yo = yp + ym
+    yob = ypb + ymb
+
+    out = yo * torch.nan_to_num(y / yob).detach()
+    return out
+
 def xai_forward_bias_rule(self, input: torch.Tensor):
+    # We use the rule where we normalize the relevance either by
+    # the bias or by the sum over the activations
+    y = F.linear(input, self.weight, self.bias)
+    y = self.activation(y)
+
+    # forward pass without bias
+    ynb = F.linear(input, self.weight)
+
+    # max bias rule
+    renormalization_factor = torch.vstack(ynb.shape[0] * self.bias)
+    renormalization_factor = renormalization_factor.view(ynb.shape)
+    ynb = torch.maximum(ynb, renormalization_factor)
+
+    out = ynb * torch.nan_to_num(y / ynb).detach()
+
+    return out
+
+def xai_forward_gen_gamma_and_bias_rule(self, input: torch.Tensor):
     # We use the rule where we normalize the relevance either by
     # the bias or by the sum over the activations
     y = F.linear(input, self.weight, self.bias)
@@ -96,12 +160,18 @@ def apply_quotient_rule(model, forward_rule, gamma):
 
 
 class ProcessRelevance:
-    def __init__(self, model, device, target, gamma=0.1, use_bias_rule_and_gamma=True, zero_bias=False):
+    def __init__(self, model, device, target, gamma=0.1, use_bias_rule_and_gamma=True, use_bias_rule_only=False, use_gamma_rule_only=False, zero_bias=False):
         self.target = target
         self.gamma = gamma
         self.device = device
 
         if use_bias_rule_and_gamma:
+            forward_rule = xai_forward_gen_gamma_and_bias_rule
+        elif use_gamma_rule_only:
+            if use_bias_rule_only: 
+                raise ValueError("Cannot have use_bias_rule_only and use_gamma_rule_only : replace by use_bias_rule_and_gamma")
+            forward_rule = xai_forward_gen_gamma_rule
+        elif use_bias_rule_only:
             forward_rule = xai_forward_bias_rule
         else:
             forward_rule = xai_forward
@@ -354,9 +424,16 @@ class ProcessRelevance:
 
 class ProcessRelevanceGNNLRP(ProcessRelevance):
 
-    def __init__(self, model, device, target, gamma=0.1, use_bias_rule_and_gamma=True, zero_bias=False):
+    def __init__(self, model, device, target, gamma=0.1, use_bias_rule_and_gamma=True, use_bias_rule_only=False, use_gamma_rule_only=False, zero_bias=False):
         super(ProcessRelevanceGNNLRP, self).__init__(
-            model, device, target, gamma, use_bias_rule_and_gamma, zero_bias=zero_bias
+            model, 
+            device, 
+            target, 
+            gamma, 
+            use_bias_rule_and_gamma=use_bias_rule_and_gamma, 
+            use_bias_rule_only=use_bias_rule_only, 
+            use_gamma_rule_only=use_gamma_rule_only, 
+            zero_bias=zero_bias
         )
 
     def process(self, sample, all_walks=None, batchsize=1):
