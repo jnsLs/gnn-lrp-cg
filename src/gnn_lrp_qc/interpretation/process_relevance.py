@@ -36,43 +36,24 @@ def xai_forward_gen_gamma_rule(self, input: torch.Tensor):
                    self.weight + self.gamma * -(-self.weight).clamp(0))  # negative activation
     yp *= (y > 1e-6).float()
 
-    # Now the denominator
-    ypb = F.linear(input.clamp(0),
-                   self.weight + self.gamma * self.weight.clamp(0))  # positive activation
-    ypb += F.linear(-(-input).clamp(0),
-                    self.weight + self.gamma * -(-self.weight).clamp(0))  # negative activation
-
-    ypb *= (y > 1e-6).float()
-
     # negative output
     ym = F.linear(input.clamp(0),
                   self.weight + self.gamma * (-(-self.weight).clamp(0)),
                   self.bias + self.gamma * (-(-self.bias).clamp(0)))  # positive activation
-
     ym += F.linear(-(-input).clamp(0),
                    self.weight + self.gamma * self.weight.clamp(0))  # negative activation
     ym *= (y < -1e-6).float()
 
-    # And the denominator
-    ymb = F.linear(input.clamp(0),
-                   self.weight + self.gamma * (-(-self.weight).clamp(0)))  # positive activation
-    ymb += F.linear(-(-input).clamp(0),
-                    self.weight + self.gamma * self.weight.clamp(0))  # negative activation
-
-    ymb *= (y < -1e-6).float()
-
     # Add positiv and negative up
     yo = yp + ym
-    yob = ypb + ymb
 
-    out = yo * torch.nan_to_num(y / yob).detach()
+    out = yo * torch.nan_to_num(y / yo).detach()
     return out
 
 def xai_forward_bias_rule(self, input: torch.Tensor):
     # We use the rule where we normalize the relevance either by
     # the bias or by the sum over the activations
     y = F.linear(input, self.weight, self.bias)
-    y = self.activation(y)
 
     # forward pass without bias
     ynb = F.linear(input, self.weight)
@@ -82,7 +63,7 @@ def xai_forward_bias_rule(self, input: torch.Tensor):
     renormalization_factor = renormalization_factor.view(ynb.shape)
     ynb = torch.maximum(ynb, renormalization_factor)
 
-    out = ynb * torch.nan_to_num(y / ynb).detach()
+    out = y * torch.nan_to_num(self.activation(y) / ynb).detach()
 
     return out
 
