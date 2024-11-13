@@ -61,9 +61,9 @@ def xai_forward_bias_rule(self, input: torch.Tensor):
     # max bias rule
     renormalization_factor = torch.vstack(ynb.shape[0] * [self.bias])
     renormalization_factor = renormalization_factor.view(ynb.shape)
-    ynb = torch.maximum(ynb, renormalization_factor)
+    ynorm = torch.where(torch.abs(ynb)>torch.abs(renormalization_factor), ynb, renormalization_factor)
 
-    out = y * torch.nan_to_num(self.activation(y) / ynb).detach()
+    out = y * torch.nan_to_num(self.activation(y) / ynorm).detach()
 
     return out
 
