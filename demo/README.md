@@ -33,6 +33,22 @@ conda install -c conda-forge pandas jupyter ipython
 python -m ipykernel install --user --name cg-lrp-test --display-name "cg-lrp-test"
 ```
 
+Alternatively, install the environment `cg-lrp` from the provided yaml file:
+```
+conda env create -f cg-lrp.yaml
+```
+And install schnetpack and gnn-lrp-cg:
+```
+git clone https://github.com/atomistic-machine-learning/schnetpack.git 
+cd schnetpack
+pip install .
+cd ../
+
+git clone https://github.com/jnsLs/gnn-lrp-cg.git
+cd gnn-lrp-cg
+pip install .
+```
+
 ## Running instructions
 
 This demo shows how to run the interpretation of a single methane frame with the so3net model shown in the manuscript. The methane frame is present as a pickle file (containing a dictionary in the format readable by SchNetPack) in `demo/interpretation/frames/frame_0.pkl`.
