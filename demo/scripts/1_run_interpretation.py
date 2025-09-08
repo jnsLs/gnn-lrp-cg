@@ -33,7 +33,7 @@ RelevanceProcessor = ProcessRelevanceGNNLRP
 zero_bias = False
 
 # load model
-model = torch.load(modelpath, map_location=torch.device(device))
+model = torch.load(modelpath, map_location=torch.device(device), weights_only=False)
 model.do_postprocessing = False
 cutoff = model.representation.cutoff.item()
 
